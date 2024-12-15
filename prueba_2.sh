@@ -39,9 +39,9 @@ function f_camb(){
     fi
 }
 
-function caja(){
-    # Función vacía, añadir lógica según sea necesario
-    echo "Función caja no implementada"
+function f_caja(){
+    #Falta funcion que guarda todas las operaciones en el dia a dia y genera un documeto donde se guarda
+
 }
 
 function menu(){
@@ -66,7 +66,7 @@ clear
             ;;
         b)
             clear
-            caja
+            f_caja
             read -p "Pulsa ENTER para continuar"
             ;;
         c)
