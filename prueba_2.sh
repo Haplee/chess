@@ -2,8 +2,10 @@
 #Prueba 2 
 
 # Variables 
-banco=50000
+#banco=50000
 v_operacion=0
+fecha=$(date '+%d:%m:%Y')
+
 
 #Funciones
 
@@ -39,8 +41,32 @@ function f_camb(){
     fi
 }
 
+
+
 function f_caja(){
     #Falta funcion que guarda todas las operaciones en el dia a dia y genera un documeto donde se guarda
+    fecha_actual=$(date '+%Y-%m-%d')
+    archivo_informe="informe_${fecha_actual}.txt"
+
+    echo -e '\n\t' "Informe diario de operaciones - $fecha_actual" > "$archivo_informe"
+    echo -e '\n\t' "=========================================" >> "$archivo_informe"
+    echo -e '\n\t' "" >> "$archivo_informe"
+    echo -e '\n\t' "Resumen:" >> "$archivo_informe"
+    echo -e '\n\t' "  Total de operaciones: $v_operacion" >> "$archivo_informe"
+    echo -e '\n\t' "  Total de ingresos: $total_ingresos" >> "$archivo_informe"
+    echo -e '\n\t' "  Saldo actual en banco: $(echo "$banco + $total_ingresos" | bc)" >> "$archivo_informe"
+    echo -e '\n\t' "" >> "$archivo_informe"
+    echo -e '\n\t' "Detalle de operaciones:" >> "$archivo_informe"
+    echo -e '\n\t' "------------------------" >> "$archivo_informe"
+    cat registro_diario.txt >> "$archivo_informe"
+    echo "" >> "$archivo_informe"
+    echo "Fin del informe" >> "$archivo_informe"
+
+    echo -e '\n\t' "Informe diario generado: $archivo_informe"
+    
+    # Limpiar el registro diario para el siguiente día
+    > registro_diario.txt
+
 
 }
 
@@ -50,7 +76,7 @@ function menu(){
     echo -e '\n\t' "(C) Salir"
     echo -en '\n\t' "Introduce la opcion: "
     read v_opc 
-    v_opc=$(echo "$v_opc" | tr '[:upper:]' '[:lower:]' | cut -c1)
+    v_opc=$(echo "$v_opc" | tr '[:upper:]' '[:lower:]')
 }
 
 # Programa Principal
@@ -76,7 +102,7 @@ clear
             ;;
         *)
             clear
-            echo "Opcion no valida: $v_opc"
+            echo "$v_opc No es valida"
             ;;
     esac
 done
