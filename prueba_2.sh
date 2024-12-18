@@ -6,6 +6,10 @@
 v_operacion=0
 fecha=$(date '+%d:%m:%Y')
 
+#Debe cambiarse si el directorio de trabajo cambia 
+dir_act=$(echo $PWD)
+
+
 
 #Funciones
 
@@ -43,37 +47,64 @@ function f_camb(){
 
 
 
-function f_caja(){
-    #Falta funcion que guarda todas las operaciones en el dia a dia y genera un documeto donde se guarda
+function f_caja() {
     fecha_actual=$(date '+%Y-%m-%d')
     archivo_informe="informe_${fecha_actual}.txt"
 
-    echo -e '\n\t' "Informe diario de operaciones - $fecha_actual" > "$archivo_informe"
-    echo -e '\n\t' "=========================================" >> "$archivo_informe"
-    echo -e '\n\t' "" >> "$archivo_informe"
-    echo -e '\n\t' "Resumen:" >> "$archivo_informe"
-    echo -e '\n\t' "  Total de operaciones: $v_operacion" >> "$archivo_informe"
-    echo -e '\n\t' "  Total de ingresos: $total_ingresos" >> "$archivo_informe"
-    echo -e '\n\t' "  Saldo actual en banco: $(echo "$banco + $total_ingresos" | bc)" >> "$archivo_informe"
-    echo -e '\n\t' "" >> "$archivo_informe"
-    echo -e '\n\t' "Detalle de operaciones:" >> "$archivo_informe"
-    echo -e '\n\t' "------------------------" >> "$archivo_informe"
-    cat registro_diario.txt >> "$archivo_informe"
-    echo "" >> "$archivo_informe"
-    echo "Fin del informe" >> "$archivo_informe"
+    # Crear el archivo de informe
+    {
+        echo -e "\n\tInforme diario de operaciones - $fecha_actual"
+        echo -e "\n\t========================================="
+        echo -e "\n\tResumen:"
+        echo -e "\n\t  Total de operaciones: ${v_operacion:-0}"
+        echo -e "\n\t  Total de ingresos: ${total_ingresos:-0}"
+        
+        # Calcular saldo sin usar bc
+        saldo_actual=$((${banco:-0} + ${total_ingresos:-0}))
+        echo -e "\n\t  Saldo actual en banco: $saldo_actual"
+        
+        echo -e "\n\tDetalle de operaciones:"
+        echo -e "\n\t------------------------"
+        
+        # Verificar si existe el archivo registro_diario.txt
+        if [ -f "registro_diario.txt" ]; then
+            cat registro_diario.txt
+        else
+            echo -e "\n\tNo hay operaciones registradas para hoy."
+        fi
+        
+        echo -e "\n\nFin del informe"
+    } > "$archivo_informe"
 
-    echo -e '\n\t' "Informe diario generado: $archivo_informe"
+    echo -e "\n\tInforme diario generado: $archivo_informe"
     
-    # Limpiar el registro diario para el siguiente día
+    # Limpiar o crear el registro diario para el siguiente día
     > registro_diario.txt
+}
 
+function f_list_informe(){
+    if [ -z "$dir_act" ]; then
+        dir_act="/c/Users/Fran/Proyectos"
+    fi
+
+    if [ -d "$dir_act" ]; then
+        cd "$dir_act"
+        ls | grep -i "informe_*"
+        echo -en '\n\t' "Escoge el informe a leer"
+        read informe_elegido
+        if [  ]; then
+    else
+        echo -en '\n\t' "El directorio $dir_act no existe"
+    fi
 
 }
+
 
 function menu(){
     echo -e '\n\t' "(A) Introducir Operacion"
     echo -e '\n\t' "(B) Contar dia actual"
-    echo -e '\n\t' "(C) Salir"
+    echo -e '\n\t' "(C) Mostrar informes"
+    echo -e '\n\t' "(D) Salir"
     echo -en '\n\t' "Introduce la opcion: "
     read v_opc 
     v_opc=$(echo "$v_opc" | tr '[:upper:]' '[:lower:]')
@@ -88,18 +119,27 @@ clear
             clear
             f_camb
             ((v_operacion++))
-            read -p "Pulsa ENTER para continuar"
+            echo -en '\n\t' "Pulsa ENTER para continuar ..."
+            read 
             ;;
         b)
             clear
             f_caja
-            read -p "Pulsa ENTER para continuar"
+            echo -en '\n\t' "Pulsa ENTER para continuar ..."
+            read
             ;;
         c)
+            clear 
+            f_list_informe
+            echo -en '\n\t' "Pulsa ENTER para continuar ..."
+            read
+            ;;
+        d)
             clear
             echo "Saliendo..."
             exit
             ;;
+
         *)
             clear
             echo "$v_opc No es valida"
