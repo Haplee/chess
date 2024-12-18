@@ -77,9 +77,6 @@ function f_caja() {
     } > "$archivo_informe"
 
     echo -e "\n\tInforme diario generado: $archivo_informe"
-    
-    # Limpiar o crear el registro diario para el siguiente día
-    > registro_diario.txt
 }
 
 function f_list_informe(){
@@ -89,15 +86,25 @@ function f_list_informe(){
 
     if [ -d "$dir_act" ]; then
         cd "$dir_act"
-        ls | grep -i "informe_*"
-        echo -en '\n\t' "Escoge el informe a leer"
+        informes=$(ls | grep -i "informe_*")
+        if [ -z "$informes" ]; then
+            echo -e "\n\tNo se encontraron informes en el directorio $dir_act"
+            return 1
+        fi
+        echo "$informes"
+        echo -en '\n\tEscoge el informe a leer: '
         read informe_elegido
-        if [  ]; then
+        if [ ! -z "$informe_elegido" ] && [ -f "$informe_elegido" ]; then
+            cat "$informe_elegido"
+        else
+            echo -e "\n\tEl informe seleccionado no existe o no es válido."
+        fi
     else
-        echo -en '\n\t' "El directorio $dir_act no existe"
+        echo -e "\n\tEl directorio $dir_act no existe"
+        return 1
     fi
-
 }
+
 
 
 function menu(){
@@ -136,6 +143,8 @@ clear
             ;;
         d)
             clear
+            # Limpiar o crear el registro diario al salir 
+            echo "" > registro_diario.txt
             echo "Saliendo..."
             exit
             ;;
