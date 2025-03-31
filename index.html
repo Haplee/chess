@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Ajedrez 1vs1</title>
+    <style>
+        body {
+            background-color: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            position: relative;
+        }
+        #controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 80px);
+            grid-template-rows: repeat(8, 80px);
+            border: 2px solid #444;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 640px;
+            height: 640px;
+            position: relative;
+        }
+        .square {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            cursor: pointer;
+            position: relative;
+        }
+        .light {
+            background-color: #f0d9b5;
+        }
+        .dark {
+            background-color: #b58863;
+        }
+        .selected {
+            background-color: #ffff99 !important;
+        }
+        .possible-move::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #99ff99;
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+        #turn-indicator {
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        #white-timer {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+        }
+        #black-timer {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+        }
+        #surrender {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #surrender:hover {
+            background-color: #555;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div id="turn-indicator">Turno: Blancas</div>
+    </div>
+    <div id="board"></div>
+    <div id="white-timer" class="chronometer">Blancas: 00:00</div>
+    <div id="black-timer" class="chronometer">Negras: 00:00</div>
+    <button id="surrender">Rendirse</button>
+
+    <script>
+        // Configuración inicial
+        const board = document.getElementById('board');
+        const squares = [];
+        const pieces = {
+            'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
+            'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+        };
+        let selectedPiece = null;
+        let turn = 'white';
+        let whiteTimer = null;
+        let blackTimer = null;
+        let whiteSeconds = 0;
+        let blackSeconds = 0;
+        let gameOver = false;
+
+        // Posición inicial del tablero
+        const initialPosition = [
+            'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r',
+            'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p',
+            '', '', '', '', '', '', '', '',
+            '', '', '', '', '', '', '', '',
+            '', '', '', '', '', '', '', '',
+            '', '', '', '', '', '', '', '',
+            'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P',
+            'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'
+        ];
+
+        // Crear el tablero
+        for (let i = 0; i < 64; i++) {
+            const square = document.createElement('div');
+            square.classList.add('square');
+            square.classList.add((Math.floor(i / 8) + i % 8) % 2 === 0 ? 'light' : 'dark');
+            square.dataset.index = i;
+            square.textContent = initialPosition[i] ? pieces[initialPosition[i]] : '';
+            squares.push(square);
+            board.appendChild(square);
+        }
+
+        // Manejo de clics
+        squares.forEach(square => {
+            square.addEventListener('click', () => {
+                if (gameOver) return;
+                const index = parseInt(square.dataset.index);
+
+                if (selectedPiece !== null) {
+                    if (isValidMove(selectedPiece, index)) {
+                        movePiece(selectedPiece, index);
+                        selectedPiece = null;
+                        clearHighlights();
+                        switchTurn();
+                        checkGameOver();
+                    } else {
+                        selectedPiece = null;
+                        clearHighlights();
+                    }
+                } else {
+                    if (square.textContent && isTurnPiece(square.textContent)) {
+                        selectedPiece = index;
+                        highlightSelected(index);
+                        highlightPossibleMoves(index);
+                    }
+                }
+            });
+        });
+
+        // Funciones del juego
+        function isTurnPiece(piece) {
+            return (turn === 'white' && piece === piece.toUpperCase()) ||
+                   (turn === 'black' && piece === piece.toLowerCase());
+        }
+
+        function isEnemyPiece(piece, enemyTurn) {
+            if (!piece) return false;
+            return (enemyTurn === 'white' && piece === piece.toLowerCase()) ||
+                   (enemyTurn === 'black' && piece === piece.toUpperCase());
+        }
+
+        function highlightSelected(index) {
+            squares[index].classList.add('selected');
+        }
+
+        function highlightPossibleMoves(index) {
+            const piece = squares[index].textContent;
+            const row = Math.floor(index / 8);
+            const col = index % 8;
+            const moves = [];
+
+            if (piece === pieces['P']) {
+                if (!squares[index - 8].textContent) moves.push(index - 8); // Avanzar una
+                if (row === 6 && !squares[index - 16].textContent && !squares[index - 8].textContent) moves.push(index - 16); // Avanzar dos
+                if (col > 0 && isEnemyPiece(squares[index - 9].textContent, 'black')) moves.push(index - 9); // Capturar izq
+                if (col < 7 && isEnemyPiece(squares[index - 7].textContent, 'black')) moves.push(index - 7); // Capturar der
+            } else if (piece === pieces['p']) {
+                if (!squares[index + 8].textContent) moves.push(index + 8); // Avanzar una
+                if (row === 1 && !squares[index + 16].textContent && !squares[index + 8].textContent) moves.push(index + 16); // Avanzar dos
+                if (col > 0 && isEnemyPiece(squares[index + 7].textContent, 'white')) moves.push(index + 7); // Capturar izq
+                if (col < 7 && isEnemyPiece(squares[index + 9].textContent, 'white')) moves.push(index + 9); // Capturar der
+            }
+
+            moves.forEach(move => {
+                if (move >= 0 && move < 64) {
+                    squares[move].classList.add('possible-move');
+                }
+            });
+        }
+
+        function clearHighlights() {
+            squares.forEach(square => {
+                square.classList.remove('selected', 'possible-move');
+            });
+        }
+
+        function isValidMove(from, to) {
+            const piece = squares[from].textContent;
+            const target = squares[to].textContent;
+            const rowFrom = Math.floor(from / 8);
+            const colFrom = from % 8;
+            const rowTo = Math.floor(to / 8);
+            const colTo = to % 8;
+            const diffRow = rowTo - rowFrom;
+            const diffCol = colTo - colFrom;
+
+            if (piece === pieces['P']) { // Peón blanco
+                if (diffCol === 0 && diffRow === -1 && !target) return true; // Avanzar una casilla
+                if (rowFrom === 6 && diffCol === 0 && diffRow === -2 && !target && !squares[from - 8].textContent) return true; // Avanzar dos
+                if (Math.abs(diffCol) === 1 && diffRow === -1 && isEnemyPiece(target, 'black')) return true; // Capturar
+            } else if (piece === pieces['p']) { // Peón negro
+                if (diffCol === 0 && diffRow === 1 && !target) return true; // Avanzar una casilla
+                if (rowFrom === 1 && diffCol === 0 && diffRow === 2 && !target && !squares[from + 8].textContent) return true; // Avanzar dos
+                if (Math.abs(diffCol) === 1 && diffRow === 1 && isEnemyPiece(target, 'white')) return true; // Capturar
+            }
+            return false; // Otros movimientos no implementados
+        }
+
+        function movePiece(from, to) {
+            squares[to].textContent = squares[from].textContent;
+            squares[from].textContent = '';
+        }
+
+        function switchTurn() {
+            turn = turn === 'white' ? 'black' : 'white';
+            document.getElementById('turn-indicator').textContent = `Turno: ${turn === 'white' ? 'Blancas' : 'Negras'}`;
+            if (turn === 'white') {
+                clearInterval(blackTimer);
+                whiteTimer = setInterval(() => {
+                    whiteSeconds++;
+                    updateTimer('white');
+                }, 1000);
+            } else {
+                clearInterval(whiteTimer);
+                blackTimer = setInterval(() => {
+                    blackSeconds++;
+                    updateTimer('black');
+                }, 1000);
+            }
+        }
+
+        function updateTimer(player) {
+            const seconds = player === 'white' ? whiteSeconds : blackSeconds;
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            const timerElement = document.getElementById(player + '-timer');
+            timerElement.textContent = `${player.charAt(0).toUpperCase() + player.slice(1)}: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function checkGameOver() {
+            // Simulación: termina tras 20 segundos totales
+            if (whiteSeconds + blackSeconds > 20) {
+                gameOver = true;
+                clearInterval(whiteTimer);
+                clearInterval(blackTimer);
+                alert('¡Juego terminado!');
+            }
+        }
+
+        // Botón de rendirse
+        document.getElementById('surrender').addEventListener('click', () => {
+            if (!gameOver) {
+                gameOver = true;
+                clearInterval(whiteTimer);
+                clearInterval(blackTimer);
+                alert(`¡${turn === 'white' ? 'Blancas' : 'Negras'} se han rendido!`);
+            }
+        });
+    </script>
+</body>
+</html>
