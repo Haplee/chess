@@ -1,292 +1,106 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Juego de Ajedrez 1vs1</title>
-    <style>
-        body {
-            background-color: #222;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            position: relative;
-        }
-        #controls {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        #board {
-            display: grid;
-            grid-template-columns: repeat(8, 80px);
-            grid-template-rows: repeat(8, 80px);
-            border: 2px solid #444;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            width: 640px;
-            height: 640px;
-            position: relative;
-        }
-        .square {
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            cursor: pointer;
-            position: relative;
-        }
-        .light {
-            background-color: #f0d9b5;
-        }
-        .dark {
-            background-color: #b58863;
-        }
-        .selected {
-            background-color: #ffff99 !important;
-        }
-        .possible-move::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: #99ff99;
-            border-radius: 50%;
-            opacity: 0.7;
-        }
-        #turn-indicator {
-            font-size: 20px;
-            margin-top: 10px;
-        }
-        #white-timer {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 24px;
-        }
-        #black-timer {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 24px;
-        }
-        #surrender {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #surrender:hover {
-            background-color: #555;
-            color: #fff;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego de Ajedrez 1vs1 Mejorado</title>
+  <!-- Tablero visual -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
+  <style>
+    body { background: #222; color: #fff; font-family: Arial, sans-serif; margin:0; padding:0; display:flex; flex-direction:column; align-items:center; }
+    #board { width: 480px; margin: 20px; }
+    #controls { display:flex; gap:10px; align-items:center; }
+    button { padding:8px 12px; border:none; border-radius:4px; cursor:pointer; }
+    #moves { max-height:200px; overflow:auto; width:480px; background:#333; padding:10px; border-radius:4px; }
+  </style>
 </head>
 <body>
-    <div id="controls">
-        <div id="turn-indicator">Turno: Blancas</div>
-    </div>
-    <div id="board"></div>
-    <div id="white-timer" class="chronometer">Blancas: 00:00</div>
-    <div id="black-timer" class="chronometer">Negras: 00:00</div>
-    <button id="surrender">Rendirse</button>
+  <div id="controls">
+    <div id="turn">Turno: Blancas</div>
+    <button id="offerDraw">Ofrecer Tablas</button>
+    <button id="resign">Rendirse</button>
+  </div>
+  <div id="board"></div>
+  <div id="timers">
+    <span id="whiteClock">Blancas: 10:00</span> –
+    <span id="blackClock">Negras: 10:00</span>
+  </div>
+  <div id="moves"></div>
 
-    <script>
-        // Configuración inicial
-        const board = document.getElementById('board');
-        const squares = [];
-        const pieces = {
-            'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-            'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
-        };
-        let selectedPiece = null;
-        let turn = 'white';
-        let whiteTimer = null;
-        let blackTimer = null;
-        let whiteSeconds = 0;
-        let blackSeconds = 0;
-        let gameOver = false;
+  <script type="module">
+    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.2.0/esm/chess.js';  // Lógica completa: movimientos, jaque, mate, tablas, en passant, promoción, enroque :contentReference[oaicite:0]{index=0}
+    import Chessboard from 'https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js';
 
-        // Posición inicial del tablero
-        const initialPosition = [
-            'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r',
-            'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p',
-            '', '', '', '', '', '', '', '',
-            '', '', '', '', '', '', '', '',
-            '', '', '', '', '', '', '', '',
-            '', '', '', '', '', '', '', '',
-            'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P',
-            'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'
-        ];
+    const chess = new Chess();                                      // Estado del juego
+    const board = Chessboard('board', { position: 'start', draggable: true, onDrop: handleMove });
 
-        // Crear el tablero
-        for (let i = 0; i < 64; i++) {
-            const square = document.createElement('div');
-            square.classList.add('square');
-            square.classList.add((Math.floor(i / 8) + i % 8) % 2 === 0 ? 'light' : 'dark');
-            square.dataset.index = i;
-            square.textContent = initialPosition[i] ? pieces[initialPosition[i]] : '';
-            squares.push(square);
-            board.appendChild(square);
-        }
+    // Temporizadores (10 min inicial, control de reloj FIDE) :contentReference[oaicite:1]{index=1}
+    let clocks = { white: 600, black: 600 }, timers = {};
+    function startClock(color) {
+      clearInterval(timers.white); clearInterval(timers.black);
+      timers[color] = setInterval(() => {
+        clocks[color]--; updateClocks();
+        if (clocks[color] <= 0) { gameOver(`${color==='white'?'Blancas':'Negras'} pierde por tiempo`); }
+      }, 1000);
+    }
+    function updateClocks() {
+      ['white','black'].forEach(c=>{
+        let m=Math.floor(clocks[c]/60), s=clocks[c]%60;
+        document.getElementById(c+'Clock').textContent = `${c==='white'?'Blancas':'Negras'}: ${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+      });
+    }
+    startClock('white');
 
-        // Manejo de clics
-        squares.forEach(square => {
-            square.addEventListener('click', () => {
-                if (gameOver) return;
-                const index = parseInt(square.dataset.index);
+    // Registro de movimientos (notación algebraica) :contentReference[oaicite:2]{index=2}
+    function refreshMoves() {
+      const history = chess.history({ verbose: true });
+      document.getElementById('moves').innerHTML = history.map((m,i) => 
+        (i%2===0?`${Math.floor(i/2)+1}. `:'') + m.san
+      ).join(' ');
+    }
 
-                if (selectedPiece !== null) {
-                    if (isValidMove(selectedPiece, index)) {
-                        movePiece(selectedPiece, index);
-                        selectedPiece = null;
-                        clearHighlights();
-                        switchTurn();
-                        checkGameOver();
-                    } else {
-                        selectedPiece = null;
-                        clearHighlights();
-                    }
-                } else {
-                    if (square.textContent && isTurnPiece(square.textContent)) {
-                        selectedPiece = index;
-                        highlightSelected(index);
-                        highlightPossibleMoves(index);
-                    }
-                }
-            });
-        });
+    // Gestión del turno y UI
+    function updateTurn() {
+      document.getElementById('turn').textContent = 'Turno: ' + (chess.turn()==='w'?'Blancas':'Negras');
+      startClock(chess.turn()==='w'?'white':'black');
+    }
 
-        // Funciones del juego
-        function isTurnPiece(piece) {
-            return (turn === 'white' && piece === piece.toUpperCase()) ||
-                   (turn === 'black' && piece === piece.toLowerCase());
-        }
+    // Comprueba fin de partida: jaque mate, tablas por 50 movimientos, repetición o material insuficiente :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4} :contentReference[oaicite:5]{index=5}
+    function handleEnd() {
+      if (chess.isCheckmate()) gameOver('¡Jaque mate! ' + (chess.turn()==='w'?'Negras':'Blancas') + ' gana');
+      else if (chess.isStalemate()) gameOver('Tablas por ahogado');                           // Art. 5.2.1 :contentReference[oaicite:6]{index=6}
+      else if (chess.isInsufficientMaterial()) gameOver('Tablas por material insuficiente');   // Art. 5.2.2 :contentReference[oaicite:7]{index=7}
+      else if (chess.isThreefoldRepetition()) gameOver('Tablas por tres repeticiones');        // Art. 9.2 :contentReference[oaicite:8]{index=8}
+      else if (chess.isDraw()) gameOver('Tablas (regla 50 movimientos)');                      // Art. 9.3 :contentReference[oaicite:9]{index=9}
+    }
 
-        function isEnemyPiece(piece, enemyTurn) {
-            if (!piece) return false;
-            return (enemyTurn === 'white' && piece === piece.toLowerCase()) ||
-                   (enemyTurn === 'black' && piece === piece.toUpperCase());
-        }
+    // Mueve la pieza usando chess.js (valida enroque Art.3.8 :contentReference[oaicite:10]{index=10}, en passant Art.3.7.4 :contentReference[oaicite:11]{index=11}, promoción Art.3.7.5 :contentReference[oaicite:12]{index=12})
+    function handleMove(source, target, piece) {
+      const move = chess.move({ from: source, to: target, promotion: 'q' });
+      if (move) {
+        board.position(chess.fen());
+        refreshMoves();
+        updateTurn();
+        handleEnd();
+        return true;
+      }
+      return 'snapback';
+    }
 
-        function highlightSelected(index) {
-            squares[index].classList.add('selected');
-        }
+    // Ofrecer tablas (claim) :contentReference[oaicite:13]{index=13}
+    document.getElementById('offerDraw').onclick = () => {
+      if (chess.canClaimThreefoldRepetition()) gameOver('Tablas reclamadas por repetición');
+      else if (chess.canClaimFiftyMoves()) gameOver('Tablas reclamadas por regla de 50 movimientos');
+      else alert('No se cumplen condiciones de tablas'); 
+    };
 
-        function highlightPossibleMoves(index) {
-            const piece = squares[index].textContent;
-            const row = Math.floor(index / 8);
-            const col = index % 8;
-            const moves = [];
+    // Rendición
+    document.getElementById('resign').onclick = () => gameOver((chess.turn()==='w'?'Blancas':'Negras') + ' se rinden');
 
-            if (piece === pieces['P']) {
-                if (!squares[index - 8].textContent) moves.push(index - 8); // Avanzar una
-                if (row === 6 && !squares[index - 16].textContent && !squares[index - 8].textContent) moves.push(index - 16); // Avanzar dos
-                if (col > 0 && isEnemyPiece(squares[index - 9].textContent, 'black')) moves.push(index - 9); // Capturar izq
-                if (col < 7 && isEnemyPiece(squares[index - 7].textContent, 'black')) moves.push(index - 7); // Capturar der
-            } else if (piece === pieces['p']) {
-                if (!squares[index + 8].textContent) moves.push(index + 8); // Avanzar una
-                if (row === 1 && !squares[index + 16].textContent && !squares[index + 8].textContent) moves.push(index + 16); // Avanzar dos
-                if (col > 0 && isEnemyPiece(squares[index + 7].textContent, 'white')) moves.push(index + 7); // Capturar izq
-                if (col < 7 && isEnemyPiece(squares[index + 9].textContent, 'white')) moves.push(index + 9); // Capturar der
-            }
-
-            moves.forEach(move => {
-                if (move >= 0 && move < 64) {
-                    squares[move].classList.add('possible-move');
-                }
-            });
-        }
-
-        function clearHighlights() {
-            squares.forEach(square => {
-                square.classList.remove('selected', 'possible-move');
-            });
-        }
-
-        function isValidMove(from, to) {
-            const piece = squares[from].textContent;
-            const target = squares[to].textContent;
-            const rowFrom = Math.floor(from / 8);
-            const colFrom = from % 8;
-            const rowTo = Math.floor(to / 8);
-            const colTo = to % 8;
-            const diffRow = rowTo - rowFrom;
-            const diffCol = colTo - colFrom;
-
-            if (piece === pieces['P']) { // Peón blanco
-                if (diffCol === 0 && diffRow === -1 && !target) return true; // Avanzar una casilla
-                if (rowFrom === 6 && diffCol === 0 && diffRow === -2 && !target && !squares[from - 8].textContent) return true; // Avanzar dos
-                if (Math.abs(diffCol) === 1 && diffRow === -1 && isEnemyPiece(target, 'black')) return true; // Capturar
-            } else if (piece === pieces['p']) { // Peón negro
-                if (diffCol === 0 && diffRow === 1 && !target) return true; // Avanzar una casilla
-                if (rowFrom === 1 && diffCol === 0 && diffRow === 2 && !target && !squares[from + 8].textContent) return true; // Avanzar dos
-                if (Math.abs(diffCol) === 1 && diffRow === 1 && isEnemyPiece(target, 'white')) return true; // Capturar
-            }
-            return false; // Otros movimientos no implementados
-        }
-
-        function movePiece(from, to) {
-            squares[to].textContent = squares[from].textContent;
-            squares[from].textContent = '';
-        }
-
-        function switchTurn() {
-            turn = turn === 'white' ? 'black' : 'white';
-            document.getElementById('turn-indicator').textContent = `Turno: ${turn === 'white' ? 'Blancas' : 'Negras'}`;
-            if (turn === 'white') {
-                clearInterval(blackTimer);
-                whiteTimer = setInterval(() => {
-                    whiteSeconds++;
-                    updateTimer('white');
-                }, 1000);
-            } else {
-                clearInterval(whiteTimer);
-                blackTimer = setInterval(() => {
-                    blackSeconds++;
-                    updateTimer('black');
-                }, 1000);
-            }
-        }
-
-        function updateTimer(player) {
-            const seconds = player === 'white' ? whiteSeconds : blackSeconds;
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            const timerElement = document.getElementById(player + '-timer');
-            timerElement.textContent = `${player.charAt(0).toUpperCase() + player.slice(1)}: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function checkGameOver() {
-            // Simulación: termina tras 20 segundos totales
-            if (whiteSeconds + blackSeconds > 20) {
-                gameOver = true;
-                clearInterval(whiteTimer);
-                clearInterval(blackTimer);
-                alert('¡Juego terminado!');
-            }
-        }
-
-        // Botón de rendirse
-        document.getElementById('surrender').addEventListener('click', () => {
-            if (!gameOver) {
-                gameOver = true;
-                clearInterval(whiteTimer);
-                clearInterval(blackTimer);
-                alert(`¡${turn === 'white' ? 'Blancas' : 'Negras'} se han rendido!`);
-            }
-        });
-    </script>
+    function gameOver(message) {
+      clearInterval(timers.white); clearInterval(timers.black);
+      alert(message);
+    }
+  </script>
 </body>
 </html>
