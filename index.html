@@ -1,106 +1,277 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego de Ajedrez 1vs1 Mejorado</title>
-  <!-- Tablero visual -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
-  <style>
-    body { background: #222; color: #fff; font-family: Arial, sans-serif; margin:0; padding:0; display:flex; flex-direction:column; align-items:center; }
-    #board { width: 480px; margin: 20px; }
-    #controls { display:flex; gap:10px; align-items:center; }
-    button { padding:8px 12px; border:none; border-radius:4px; cursor:pointer; }
-    #moves { max-height:200px; overflow:auto; width:480px; background:#333; padding:10px; border-radius:4px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajedrez Funcional</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <style>
+        body {
+            background: #2c3e50;
+            color: #ecf0f1;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #board {
+            width: 80vw;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: opacity 0.3s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #timers {
+            display: flex;
+            gap: 30px;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        #moves {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .move-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #7f8c8d;
+        }
+
+        .promotion-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .promotion-piece {
+            width: 60px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .promotion-piece:hover {
+            transform: scale(1.1);
+        }
+    </style>
 </head>
 <body>
-  <div id="controls">
-    <div id="turn">Turno: Blancas</div>
-    <button id="offerDraw">Ofrecer Tablas</button>
-    <button id="resign">Rendirse</button>
-  </div>
-  <div id="board"></div>
-  <div id="timers">
-    <span id="whiteClock">Blancas: 10:00</span> –
-    <span id="blackClock">Negras: 10:00</span>
-  </div>
-  <div id="moves"></div>
+    <div id="timers">
+        <div id="whiteTimer">Blancas: 10:00</div>
+        <div id="blackTimer">Negras: 10:00</div>
+    </div>
 
-  <script type="module">
-    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.2.0/esm/chess.js';  // Lógica completa: movimientos, jaque, mate, tablas, en passant, promoción, enroque :contentReference[oaicite:0]{index=0}
-    import Chessboard from 'https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js';
+    <div id="board"></div>
 
-    const chess = new Chess();                                      // Estado del juego
-    const board = Chessboard('board', { position: 'start', draggable: true, onDrop: handleMove });
+    <div class="controls">
+        <button id="newGame">Nueva Partida</button>
+        <button id="offerDraw">Ofrecer Tablas</button>
+        <button id="resign">Rendirse</button>
+    </div>
 
-    // Temporizadores (10 min inicial, control de reloj FIDE) :contentReference[oaicite:1]{index=1}
-    let clocks = { white: 600, black: 600 }, timers = {};
-    function startClock(color) {
-      clearInterval(timers.white); clearInterval(timers.black);
-      timers[color] = setInterval(() => {
-        clocks[color]--; updateClocks();
-        if (clocks[color] <= 0) { gameOver(`${color==='white'?'Blancas':'Negras'} pierde por tiempo`); }
-      }, 1000);
-    }
-    function updateClocks() {
-      ['white','black'].forEach(c=>{
-        let m=Math.floor(clocks[c]/60), s=clocks[c]%60;
-        document.getElementById(c+'Clock').textContent = `${c==='white'?'Blancas':'Negras'}: ${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-      });
-    }
-    startClock('white');
+    <div id="moves"></div>
 
-    // Registro de movimientos (notación algebraica) :contentReference[oaicite:2]{index=2}
-    function refreshMoves() {
-      const history = chess.history({ verbose: true });
-      document.getElementById('moves').innerHTML = history.map((m,i) => 
-        (i%2===0?`${Math.floor(i/2)+1}. `:'') + m.san
-      ).join(' ');
-    }
+    <div class="promotion-dialog">
+        <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wQ.png" 
+             class="promotion-piece" data-piece="q">
+        <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wR.png" 
+             class="promotion-piece" data-piece="r">
+        <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wB.png" 
+             class="promotion-piece" data-piece="b">
+        <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wN.png" 
+             class="promotion-piece" data-piece="n">
+    </div>
 
-    // Gestión del turno y UI
-    function updateTurn() {
-      document.getElementById('turn').textContent = 'Turno: ' + (chess.turn()==='w'?'Blancas':'Negras');
-      startClock(chess.turn()==='w'?'white':'black');
-    }
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.3/chess.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script>
+        // Configuración inicial
+        const game = new Chess();
+        let tiempoBlancas = 600;
+        let tiempoNegras = 600;
+        let intervalo;
+        let promocionPendiente = null;
 
-    // Comprueba fin de partida: jaque mate, tablas por 50 movimientos, repetición o material insuficiente :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4} :contentReference[oaicite:5]{index=5}
-    function handleEnd() {
-      if (chess.isCheckmate()) gameOver('¡Jaque mate! ' + (chess.turn()==='w'?'Negras':'Blancas') + ' gana');
-      else if (chess.isStalemate()) gameOver('Tablas por ahogado');                           // Art. 5.2.1 :contentReference[oaicite:6]{index=6}
-      else if (chess.isInsufficientMaterial()) gameOver('Tablas por material insuficiente');   // Art. 5.2.2 :contentReference[oaicite:7]{index=7}
-      else if (chess.isThreefoldRepetition()) gameOver('Tablas por tres repeticiones');        // Art. 9.2 :contentReference[oaicite:8]{index=8}
-      else if (chess.isDraw()) gameOver('Tablas (regla 50 movimientos)');                      // Art. 9.3 :contentReference[oaicite:9]{index=9}
-    }
+        // Inicializar tablero
+        const board = Chessboard('board', {
+            pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+            position: 'start',
+            draggable: true,
+            onDragStart: manejarInicioArrastre,
+            onDrop: manejarSoltarPieza,
+            onSnapEnd: actualizarTablero
+        });
 
-    // Mueve la pieza usando chess.js (valida enroque Art.3.8 :contentReference[oaicite:10]{index=10}, en passant Art.3.7.4 :contentReference[oaicite:11]{index=11}, promoción Art.3.7.5 :contentReference[oaicite:12]{index=12})
-    function handleMove(source, target, piece) {
-      const move = chess.move({ from: source, to: target, promotion: 'q' });
-      if (move) {
-        board.position(chess.fen());
-        refreshMoves();
-        updateTurn();
-        handleEnd();
-        return true;
-      }
-      return 'snapback';
-    }
+        // Temporizador
+        function iniciarTemporizador() {
+            clearInterval(intervalo);
+            intervalo = setInterval(() => {
+                game.turn() === 'w' ? tiempoBlancas-- : tiempoNegras--;
+                actualizarTemporizadores();
+                
+                if (tiempoBlancas <= 0 || tiempoNegras <= 0) {
+                    finPartida(`¡Tiempo agotado! ${tiempoBlancas <= 0 ? 'Negras' : 'Blancas'} ganan`);
+                }
+            }, 1000);
+        }
 
-    // Ofrecer tablas (claim) :contentReference[oaicite:13]{index=13}
-    document.getElementById('offerDraw').onclick = () => {
-      if (chess.canClaimThreefoldRepetition()) gameOver('Tablas reclamadas por repetición');
-      else if (chess.canClaimFiftyMoves()) gameOver('Tablas reclamadas por regla de 50 movimientos');
-      else alert('No se cumplen condiciones de tablas'); 
-    };
+        function actualizarTemporizadores() {
+            document.getElementById('whiteTimer').textContent = 
+                `Blancas: ${formatearTiempo(tiempoBlancas)}`;
+            document.getElementById('blackTimer').textContent = 
+                `Negras: ${formatearTiempo(tiempoNegras)}`;
+        }
 
-    // Rendición
-    document.getElementById('resign').onclick = () => gameOver((chess.turn()==='w'?'Blancas':'Negras') + ' se rinden');
+        function formatearTiempo(segundos) {
+            const mins = Math.floor(segundos / 60).toString().padStart(2, '0');
+            const secs = (segundos % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
 
-    function gameOver(message) {
-      clearInterval(timers.white); clearInterval(timers.black);
-      alert(message);
-    }
-  </script>
+        // Manejo de movimientos
+        function manejarInicioArrastre(origen, pieza) {
+            return pieza.startsWith(game.turn());
+        }
+
+        async function manejarSoltarPieza(origen, destino) {
+            // Manejar promoción de peón
+            const movimiento = {
+                from: origen,
+                to: destino,
+                promotion: 'q'
+            };
+
+            const pieza = game.get(origen);
+            if (pieza?.type === 'p' && (destino[1] === '8' || destino[1] === '1')) {
+                movimiento.promotion = await mostrarDialogoPromocion(pieza.color);
+            }
+
+            try {
+                const resultado = game.move(movimiento);
+                
+                if (resultado) {
+                    actualizarHistorial();
+                    iniciarTemporizador();
+                    verificarFinJuego();
+                    return true;
+                }
+            } catch (e) {
+                console.error('Movimiento inválido:', e);
+            }
+            
+            return 'snapback';
+        }
+
+        function actualizarTablero() {
+            board.position(game.fen());
+        }
+
+        // Sistema de promoción
+        function mostrarDialogoPromocion(color) {
+            return new Promise(resolve => {
+                const dialog = document.querySelector('.promotion-dialog');
+                dialog.querySelectorAll('.promotion-piece').forEach(img => {
+                    img.src = img.src.replace(/w/, color === 'w' ? 'w' : 'b');
+                });
+                
+                dialog.style.display = 'flex';
+                
+                const handler = e => {
+                    if (e.target.classList.contains('promotion-piece')) {
+                        dialog.style.display = 'none';
+                        resolve(e.target.dataset.piece);
+                        dialog.removeEventListener('click', handler);
+                    }
+                };
+                
+                dialog.addEventListener('click', handler);
+            });
+        }
+
+        // Historial de movimientos
+        function actualizarHistorial() {
+            const movesDiv = document.getElementById('moves');
+            movesDiv.innerHTML = game.history().map((move, i) => 
+                `<div class="move-entry">${i + 1}. ${move}</div>`
+            ).join('');
+            movesDiv.scrollTop = movesDiv.scrollHeight;
+        }
+
+        // Finalización del juego
+        function verificarFinJuego() {
+            if (game.isCheckmate()) {
+                finPartida(`¡Jaque mate! ${game.turn() === 'w' ? 'Negras' : 'Blancas'} ganan`);
+            } else if (game.isDraw()) {
+                finPartida('¡Tablas!');
+            }
+        }
+
+        function finPartida(mensaje) {
+            clearInterval(intervalo);
+            alert(mensaje);
+            board.draggable = false;
+        }
+
+        // Controles
+        document.getElementById('newGame').addEventListener('click', () => {
+            game.reset();
+            board.position('start');
+            tiempoBlancas = tiempoNegras = 600;
+            actualizarTemporizadores();
+            actualizarHistorial();
+            board.draggable = true;
+            iniciarTemporizador();
+        });
+
+        document.getElementById('offerDraw').addEventListener('click', () => {
+            if (confirm('¿Ofrecer tablas?')) {
+                finPartida('Partida empatada por acuerdo');
+            }
+        });
+
+        document.getElementById('resign').addEventListener('click', () => {
+            if (confirm('¿Confirmas que quieres rendirte?')) {
+                finPartida(`${game.turn() === 'w' ? 'Blancas' : 'Negras'} se rinden`);
+            }
+        });
+
+        // Inicialización
+        iniciarTemporizador();
+        actualizarTemporizadores();
+    </script>
 </body>
 </html>
